@@ -1,0 +1,33 @@
+# Render.com Static Site config for THE BIG CON — FPS BATTLE ROYALE
+# Docs: https://render.com/docs/blueprint-spec
+# Push to your repo and Render will auto-detect this on import.
+
+services:
+  - type: web
+    name: bigcon-fps
+    runtime: static
+    # Next.js static export — produces `out/` after this command runs.
+    buildCommand: npm install && npm run export
+    # The folder containing the static HTML/CSS/JS to serve.
+    staticPublishPath: ./out
+    # Cache deps between builds for faster rebuilds.
+    buildFilter:
+      paths:
+        - src/**
+        - public/**
+        - package.json
+        - next.config.ts
+    pullRequestPreviewsEnabled: false
+    # Custom domain: set this in the Render dashboard (Settings → Custom Domains).
+    envVars:
+      - key: NODE_ENV
+        value: production
+    headers:
+      # Long-cache the hashed _next/static assets.
+      - path: /_next/static/*
+        name: Cache-Control
+        value: public, max-age=31536000, immutable
+      # Don't cache the HTML (so deploys ship immediately).
+      - path: /*
+        name: Cache-Control
+        value: no-cache
