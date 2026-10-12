@@ -1,0 +1,584 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+/* ============ THE BIG CON — FPS BR visual identity ============
+   Carried over verbatim from the original board game:
+   - Background #1d201f (charcoal)
+   - Teal/cyan #168388 (the brand colour)
+   - Cream / burlywood / aqua accent text
+   - Times New Roman serif for titles, character names, headlines
+   - Square corners, hard borders, drop shadows, no rounded plush
+*/
+
+:root {
+  --radius: 0;
+  --bc-bg: #1d201f;
+  --bc-card: #111413;
+  --bc-teal: #168388;
+  --bc-teal-dim: #0e5c60;
+  --bc-cream: #f2f2f2;
+  --bc-burl: burlywood;
+  --bc-aqua: aqua;
+  --bc-soft: #9ad;
+  --bc-red: #ff6b5e;
+  --bc-gold: #f5c542;
+  --bc-blue: #55c1ff;
+  --bc-purple: #e19bff;
+  --bc-green: #7fe08d;
+  --bc-pink: #ff5e9c;
+  --bc-orange: #ffa94d;
+  --bc-mint: #00e5c0;
+  --background: #1d201f;
+  --foreground: #f2f2f2;
+  --card: #111413;
+  --card-foreground: #f2f2f2;
+  --popover: #111413;
+  --popover-foreground: #f2f2f2;
+  --primary: #168388;
+  --primary-foreground: #ffffff;
+  --secondary: #04100f;
+  --secondary-foreground: #f2f2f2;
+  --muted: #04100f;
+  --muted-foreground: #9ad;
+  --accent: #168388;
+  --accent-foreground: #ffffff;
+  --destructive: #ff6b5e;
+  --border: #168388;
+  --input: #168388;
+  --ring: #168388;
+  --chart-1: #f5c542;
+  --chart-2: #55c1ff;
+  --chart-3: #e19bff;
+  --chart-4: #7fe08d;
+  --chart-5: #ff6b5e;
+  --sidebar: #111413;
+  --sidebar-foreground: #f2f2f2;
+  --sidebar-primary: #168388;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #04100f;
+  --sidebar-accent-foreground: #f2f2f2;
+  --sidebar-border: #168388;
+  --sidebar-ring: #168388;
+}
+
+@layer base {
+  * {
+    border-color: var(--bc-teal);
+  }
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: var(--bc-bg);
+    color: var(--bc-cream);
+    font-family: system-ui, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
+    overflow: hidden;
+  }
+  body {
+    height: 100vh;
+    width: 100vw;
+  }
+}
+
+/* Big Con typography helpers */
+.bc-serif {
+  font-family: "Times New Roman", Times, serif;
+}
+.bc-mono {
+  font-family: ui-monospace, "SFMono-Regular", Menlo, Monaco, Consolas, monospace;
+  letter-spacing: 1px;
+}
+
+/* Big Con button — hard-edged, teal-bordered */
+.bc-btn {
+  font-family: inherit;
+  font-weight: 900;
+  letter-spacing: 1px;
+  border: 2px solid var(--bc-teal);
+  background: #000;
+  color: #fff;
+  padding: 12px 18px;
+  cursor: pointer;
+  border-radius: 0;
+  transition: background 0.15s;
+}
+.bc-btn:hover:not(:disabled) {
+  background: var(--bc-teal);
+}
+.bc-btn:disabled {
+  opacity: 0.42;
+  cursor: not-allowed;
+}
+.bc-btn.primary {
+  background: var(--bc-teal);
+  color: #fff;
+  border-color: #000;
+}
+.bc-btn.primary:hover:not(:disabled) {
+  background: var(--bc-teal-dim);
+}
+
+/* Card surfaces */
+.bc-card {
+  background: var(--bc-card);
+  border: 2px solid var(--bc-teal);
+  border-radius: 0;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.75);
+  color: var(--bc-cream);
+}
+.bc-panel {
+  background: #000;
+  border: 1px solid var(--bc-teal);
+  border-radius: 0;
+  color: var(--bc-cream);
+}
+.bc-label {
+  font-size: 10px;
+  letter-spacing: 3px;
+  color: var(--bc-soft);
+  text-transform: uppercase;
+}
+.bc-input {
+  background: #000;
+  border: 2px solid var(--bc-teal);
+  color: #fff;
+  padding: 9px 12px;
+  font-family: inherit;
+  font-size: 15px;
+  border-radius: 0;
+  outline: none;
+}
+.bc-input:focus {
+  border-color: var(--bc-aqua);
+}
+.bc-input.code {
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  font-weight: 800;
+  text-align: center;
+}
+
+/* Blink animation reused from original */
+@keyframes bc-blink {
+  50% { opacity: 0.35; }
+}
+.bc-blink {
+  animation: bc-blink 1s infinite;
+}
+@keyframes bc-halo {
+  0%, 100% { opacity: 0.2; }
+  50% { opacity: 1; }
+}
+.bc-halo {
+  animation: bc-halo 1.15s ease-in-out infinite;
+}
+
+/* Mood tints (overlay over the whole viewport) */
+.bc-mood-calm { background: rgba(70, 130, 70, 0.045); }
+.bc-mood-boom { background: rgba(200, 160, 40, 0.075); }
+.bc-mood-panic { background: rgba(170, 30, 20, 0.10); }
+.bc-mood-frenzy { background: rgba(150, 60, 170, 0.075); }
+
+/* Splash + logo */
+.bc-splash-logo {
+  width: min(100%, 520px);
+  aspect-ratio: 1 / 1;
+  height: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 18px;
+  background: #000;
+  overflow: hidden;
+  border: 2px solid var(--bc-teal);
+}
+.bc-splash-logo img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: #000;
+}
+
+/* Character grid */
+.bc-chargrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+.bc-charpick {
+  background: #000;
+  border: 2px solid #333;
+  cursor: pointer;
+  padding: 6px;
+  text-align: center;
+  color: #fff;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.bc-charpick img {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  object-position: center top;
+  display: block;
+  background: #111;
+}
+.bc-charpick .cn {
+  font-size: 11px;
+  margin-top: 5px;
+  line-height: 1.2;
+}
+.bc-charpick.on {
+  border-color: var(--bc-teal);
+  box-shadow: 0 0 0 1px var(--bc-teal);
+}
+.bc-charpick.taken {
+  opacity: 0.38;
+  cursor: not-allowed;
+}
+.bc-charpick:hover:not(.taken) {
+  border-color: var(--bc-teal);
+}
+
+/* HUD elements */
+.bc-hud {
+  position: absolute;
+  pointer-events: none;
+  color: var(--bc-cream);
+  font-family: system-ui, sans-serif;
+}
+.bc-hud.tl { top: 12px; left: 12px; }
+.bc-hud.tr { top: 12px; right: 12px; }
+.bc-hud.bl { bottom: 12px; left: 12px; }
+.bc-hud.br { bottom: 12px; right: 12px; }
+.bc-hud.tc { top: 12px; left: 50%; transform: translateX(-50%); }
+.bc-hud.bc { bottom: 12px; left: 50%; transform: translateX(-50%); }
+
+.bc-stat {
+  background: rgba(0, 0, 0, 0.78);
+  border: 1px solid var(--bc-teal);
+  padding: 8px 12px;
+  font-size: 12px;
+  letter-spacing: 1px;
+  border-radius: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  backdrop-filter: blur(2px);
+}
+.bc-stat .lab {
+  font-size: 9px;
+  letter-spacing: 3px;
+  color: var(--bc-soft);
+  text-transform: uppercase;
+}
+.bc-stat .val {
+  font-family: "Times New Roman", Times, serif;
+  font-size: 22px;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+.bc-stat.money .val { color: var(--bc-green); }
+.bc-stat.intel .val { color: var(--bc-blue); }
+.bc-stat.cortisol .val { color: var(--bc-orange); }
+.bc-stat.alive .val { color: var(--bc-gold); }
+
+/* Hit marker */
+@keyframes bc-hitmarker {
+  0% { transform: translate(-50%, -50%) scale(0.6); opacity: 1; }
+  100% { transform: translate(-50%, -50%) scale(1.4); opacity: 0; }
+}
+.bc-hitmarker {
+  position: absolute;
+  top: 50%; left: 50%;
+  width: 24px; height: 24px;
+  pointer-events: none;
+  animation: bc-hitmarker 0.4s ease-out forwards;
+  z-index: 50;
+}
+
+/* Damage flash */
+@keyframes bc-damage {
+  0% { opacity: 0.85; }
+  100% { opacity: 0; }
+}
+.bc-damage-flash {
+  position: fixed; inset: 0;
+  background: radial-gradient(circle at center, transparent 30%, rgba(255, 107, 94, 0.55) 100%);
+  pointer-events: none;
+  animation: bc-damage 0.45s ease-out forwards;
+  z-index: 40;
+}
+
+/* Toast (floating text in 3D world) */
+.bc-toast {
+  position: fixed;
+  top: 14px;
+  left: 50%;
+  transform: translate(-50%, -70px);
+  background: var(--bc-teal);
+  color: #fff;
+  font-weight: 800;
+  padding: 10px 24px;
+  border: 2px solid #000;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+  opacity: 0;
+  transition: all 0.35s;
+  z-index: 90;
+  pointer-events: none;
+  font-size: 14px;
+  letter-spacing: 1px;
+  white-space: nowrap;
+  max-width: 92vw;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.bc-toast.show {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+.bc-toast.danger {
+  background: var(--bc-red);
+}
+
+/* Crosshair */
+.bc-crosshair {
+  position: fixed;
+  top: 50%; left: 50%;
+  width: 22px; height: 22px;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  z-index: 30;
+}
+.bc-crosshair::before, .bc-crosshair::after {
+  content: "";
+  position: absolute;
+  background: var(--bc-aqua);
+  box-shadow: 0 0 4px rgba(0,0,0,0.85);
+}
+.bc-crosshair::before {
+  top: 50%; left: 0; right: 0; height: 2px; transform: translateY(-50%);
+}
+.bc-crosshair::after {
+  left: 50%; top: 0; bottom: 0; width: 2px; transform: translateX(-50%);
+}
+
+/* Weapon wheel (bottom-center) */
+.bc-weaponwheel {
+  display: flex;
+  gap: 6px;
+}
+.bc-weaponslot {
+  background: rgba(0,0,0,0.78);
+  border: 1px solid var(--bc-teal);
+  padding: 6px 12px;
+  font-size: 11px;
+  letter-spacing: 1px;
+  color: var(--bc-cream);
+  min-width: 86px;
+  text-align: center;
+}
+.bc-weaponslot.active {
+  background: var(--bc-teal);
+  color: #fff;
+}
+.bc-weaponslot .wk {
+  font-size: 9px;
+  letter-spacing: 2px;
+  color: var(--bc-soft);
+  display: block;
+}
+.bc-weaponslot.active .wk { color: rgba(255,255,255,0.7); }
+.bc-weaponslot .wn {
+  font-family: "Times New Roman", Times, serif;
+  font-size: 14px;
+  font-weight: 900;
+  letter-spacing: 2px;
+}
+
+/* Mood wire strip */
+.bc-moodstrip {
+  display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+  background: rgba(0,0,0,0.78);
+  border: 1px solid var(--bc-teal);
+  padding: 6px 11px;
+  font-size: 11px;
+  letter-spacing: 1px;
+  color: var(--bc-cream);
+}
+.bc-moodstrip .mdot {
+  width: 9px; height: 9px; border-radius: 50%;
+  flex: 0 0 9px;
+  animation: bc-blink 1.4s infinite;
+}
+.bc-moodstrip .mwire {
+  font-style: italic;
+  color: var(--bc-burl);
+  font-size: 11px;
+}
+
+/* Killfeed */
+.bc-killfeed {
+  position: absolute;
+  top: 64px;
+  right: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-width: 360px;
+  z-index: 30;
+  pointer-events: none;
+}
+.bc-killfeed .kf {
+  background: rgba(0,0,0,0.78);
+  border: 1px solid var(--bc-teal);
+  padding: 6px 10px;
+  font-size: 11.5px;
+  color: var(--bc-cream);
+  animation: bc-kfslide 0.3s ease-out;
+}
+@keyframes bc-kfslide {
+  from { opacity: 0; transform: translateX(20px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+.bc-killfeed .kf b { color: var(--bc-aqua); font-weight: 800; }
+.bc-killfeed .kf .vic { color: var(--bc-red); font-weight: 800; }
+
+/* Minimap */
+.bc-minimap {
+  width: 168px; height: 168px;
+  background: rgba(0,0,0,0.85);
+  border: 1px solid var(--bc-teal);
+  position: relative;
+}
+.bc-minimap canvas { display: block; width: 100%; height: 100%; }
+
+/* Scrollbar styling */
+.bc-scroll::-webkit-scrollbar { width: 8px; }
+.bc-scroll::-webkit-scrollbar-track { background: #000; }
+.bc-scroll::-webkit-scrollbar-thumb { background: var(--bc-teal); border-radius: 0; }
+
+/* Scoreboard */
+.bc-scoreboard {
+  position: fixed; inset: 0;
+  background: rgba(0, 0, 0, 0.86);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 80;
+  pointer-events: auto;
+}
+.bc-scoreboard .bc-card {
+  min-width: 480px;
+  max-width: 720px;
+}
+.bc-scoreboard .row {
+  display: flex; align-items: center; gap: 12px;
+  padding: 8px 12px;
+  background: #000;
+  border: 1px solid #333;
+  margin-bottom: 6px;
+}
+.bc-scoreboard .row .pdot {
+  width: 12px; height: 12px; border-radius: 50%;
+}
+.bc-scoreboard .row .pname {
+  font-weight: 800;
+  flex: 1;
+}
+.bc-scoreboard .row.dead {
+  opacity: 0.42;
+}
+.bc-scoreboard .row .pface {
+  width: 32px; height: 32px; border-radius: 50%;
+  object-fit: cover; border: 2px solid var(--bc-teal);
+}
+
+/* End screen */
+.bc-endcard {
+  text-align: center;
+  padding: 18px 28px;
+}
+.bc-endcard .etitle {
+  font-family: "Times New Roman", Times, serif;
+  font-size: 36px;
+  font-weight: 900;
+  letter-spacing: 2px;
+  color: var(--bc-aqua);
+}
+.bc-endcard .ewinname {
+  font-family: "Times New Roman", Times, serif;
+  font-size: 30px;
+  font-weight: 900;
+  color: var(--bc-gold);
+  margin: 8px 0;
+}
+
+/* Hide native scrollbar */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: #000; }
+::-webkit-scrollbar-thumb { background: var(--bc-teal); border-radius: 0; }
+
+/* Pointer lock hint */
+.bc-ptrhint {
+  position: fixed; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(0,0,0,0.65);
+  z-index: 60;
+  color: var(--bc-cream);
+  font-family: "Times New Roman", Times, serif;
+  font-size: 28px;
+  font-weight: 900;
+  letter-spacing: 4px;
+  text-align: center;
+  pointer-events: auto;
+  cursor: pointer;
+}
+.bc-ptrhint .small {
+  font-family: system-ui, sans-serif;
+  font-size: 13px;
+  letter-spacing: 1px;
+  color: var(--bc-soft);
+  margin-top: 10px;
+  font-weight: 400;
+}
