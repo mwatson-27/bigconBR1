@@ -37,6 +37,8 @@ export type NetState = {
   started: boolean;
   lobbyChat: ChatEntry[];
   goal: number;
+  // Latest authoritative state, retained so a rejoining guest can resync.
+  currentState: GameState | null;
   // Stats
   lastSeen: number;
   hbTimer: ReturnType<typeof setInterval> | null;
@@ -60,6 +62,7 @@ export function createNet(): NetState {
     started: false,
     lobbyChat: [],
     goal: GAME.GOAL_DEF,
+    currentState: null,
     lastSeen: Date.now(),
     hbTimer: null,
   };
@@ -80,6 +83,7 @@ export type NetHandlers = {
   onLobbyText?: (text: string) => void;
   onReload?: () => void;
   onGoodbye?: (fromIdx: number) => void;
+  onRejoin?: (idx: number) => void;
   onFatal?: (msg: string) => void;
   onPong?: (fromIdx: number, ts: number) => void;
 };
@@ -237,51 +241,53 @@ function onHostData(
   const idx = net.conns.indexOf(c);
   switch (d.t) {
     case "hello": {
-      // New or returning guest
-      if (idx < 0) {
-        // Seat them
-        if (net.roster.length >= GAME.MAX_PLAYERS) {
+      // Resolve this connection to an existing seat by connection first, then stable player ID.
+      let seatIdx = idx;
+      const isRejoin = seatIdx < 0 && net.roster.some((p, i) => i > 0 && p.playerId === d.playerId);
+      if (seatIdx < 0) {
+        const priorSeat = net.roster.findIndex(
+          (p, i) => i > 0 && p.playerId === d.playerId && !net.conns[i]
+        );
+        const vacantSeat = net.roster.findIndex(
+          (_p, i) => i > 0 && i < net.conns.length && !net.conns[i]
+        );
+        seatIdx = priorSeat >= 0 ? priorSeat : vacantSeat >= 0 ? vacantSeat : net.roster.length;
+        if (seatIdx >= GAME.MAX_PLAYERS) {
           safeSend(c, { t: "lobbyText", text: "Room is full." });
-          try {
-            c.close();
-          } catch (_) {
-            // ignore
-          }
+          try { c.close(); } catch (_) { /* ignore */ }
           return;
         }
-        const newIdx = net.roster.length;
-        net.conns[newIdx] = c;
-        net.roster[newIdx] = {
-          name: d.name,
-          playerId: d.playerId,
-          charId: d.charId,
-          ready: false,
-        };
-        safeSend(c, {
-          t: "welcome",
-          idx: newIdx,
-          roster: net.roster,
-          code: net.roomCode || "",
-          goal: net.goal,
-        });
-        // Sync chat history
-        net.lobbyChat.slice(-GAME.CHAT_TAIL).forEach((m) => safeSend(c, { t: "chat", msg: m }));
-        broadcastRoster(net);
-      } else {
-        // Returning — update name/char
-        if (net.roster[idx]) {
-          net.roster[idx].name = d.name;
-          if (d.charId !== null) net.roster[idx].charId = d.charId;
+        net.conns[seatIdx] = c;
+        if (net.roster[seatIdx]) {
+          net.roster[seatIdx].name = d.name;
+          net.roster[seatIdx].playerId = d.playerId;
+          if (d.charId !== null) net.roster[seatIdx].charId = d.charId;
+        } else {
+          net.roster[seatIdx] = {
+            name: d.name,
+            playerId: d.playerId,
+            charId: d.charId,
+            ready: false,
+          };
         }
-        safeSend(c, {
-          t: "welcome",
-          idx,
-          roster: net.roster,
-          code: net.roomCode || "",
-          goal: net.goal,
-        });
-        broadcastRoster(net);
+      } else if (net.roster[seatIdx]) {
+        net.roster[seatIdx].name = d.name;
+        if (d.charId !== null) net.roster[seatIdx].charId = d.charId;
       }
+
+      safeSend(c, {
+        t: "welcome",
+        idx: seatIdx,
+        roster: net.roster,
+        code: net.roomCode || "",
+        goal: net.goal,
+      });
+      net.lobbyChat.slice(-GAME.CHAT_TAIL).forEach((m) => safeSend(c, { t: "chat", msg: m }));
+      if (net.started && net.currentState) {
+        safeSend(c, { t: "start", s: net.currentState, idx: seatIdx });
+        if (isRejoin) handlers.onRejoin?.(seatIdx);
+      }
+      broadcastRoster(net);
       break;
     }
     case "charPick": {
@@ -367,6 +373,9 @@ export function hostBroadcast(
   msg: NetMessage,
   excludeIdx: number = -1
 ) {
+  if (msg.t === "state" && net.currentState) {
+    net.currentState = { ...net.currentState, ...msg.s } as GameState;
+  }
   for (let i = 0; i < net.conns.length; i++) {
     if (i === excludeIdx) continue;
     safeSend(net.conns[i], msg);
@@ -391,6 +400,8 @@ export function hostSetChar(net: NetState, idx: number, charId: string | null) {
 }
 
 export function hostBroadcastStart(net: NetState, s: GameState) {
+  net.started = true;
+  net.currentState = s;
   for (let i = 0; i < net.conns.length; i++) {
     if (i === net.myIdx) continue;
     safeSend(net.conns[i], { t: "start", s, idx: i });
@@ -420,97 +431,159 @@ function guestOpenPeer(net: NetState, handlers: NetHandlers) {
   }
   const old = net.peer;
   if (old && !old.destroyed) {
-    try {
-      old.destroy();
-    } catch (_) {
-      // ignore
-    }
+    try { old.destroy(); } catch (_) { /* ignore */ }
   }
+
   const peer = new Peer(PEER_OPTIONS);
   net.peer = peer;
-  let connected = false;
-  peer.on("open", () => {
-    handlers.onStatus?.("Contacting the host…");
+  let retryTimer: ReturnType<typeof setTimeout> | null = null;
+  let attempt = 0;
+  let connecting = false;
+  let initialAttempt = true;
+
+  const stopHeartbeat = () => {
+    if (net.hbTimer) {
+      clearInterval(net.hbTimer);
+      net.hbTimer = null;
+    }
+  };
+
+  const scheduleRetry = (message: string) => {
+    if (net.peer !== peer || peer.destroyed || retryTimer) return;
+    handlers.onStatus?.(message, true);
+    const delay = Math.min(1000 * Math.pow(2, attempt), 8000);
+    attempt = Math.min(attempt + 1, 3);
+    retryTimer = setTimeout(() => {
+      retryTimer = null;
+      if (net.peer !== peer || peer.destroyed) return;
+      if (peer.disconnected) {
+        try { peer.reconnect(); } catch (_) { scheduleRetry("Reconnecting to the signalling server…"); }
+        return; // the peer's next open event will retry the data connection
+      }
+      connectToHost();
+    }, delay);
+  };
+
+  const connectToHost = () => {
+    if (net.peer !== peer || peer.destroyed || peer.disconnected || connecting) return;
+    const existing = net.conns[0];
+    if (existing?.open) return;
+    connecting = true;
+    handlers.onStatus?.(attempt ? "Reconnecting to the host…" : "Contacting the host…");
     const c = peer.connect(PFX + net.roomCode, { reliable: true });
     net.conns = [c];
+    let opened = false;
+    let attemptTimeout: ReturnType<typeof setTimeout> | null = null;
+
+    const clearAttemptTimeout = () => {
+      if (attemptTimeout) {
+        clearTimeout(attemptTimeout);
+        attemptTimeout = null;
+      }
+    };
+
     c.on("open", () => {
-      connected = true;
+      if (net.peer !== peer || net.conns[0] !== c) {
+        try { c.close(); } catch (_) { /* ignore */ }
+        return;
+      }
+      opened = true;
+      connecting = false;
+      attempt = 0;
+      initialAttempt = false;
+      clearAttemptTimeout();
       c.__lastSeen = Date.now();
+      handlers.onStatus?.("Connected to host.");
       c.on("data", (d) => {
-        try {
-          onGuestData(net, d as NetMessage, handlers);
-        } catch (err) {
-          console.error(err);
-        }
+        try { onGuestData(net, d as NetMessage, handlers); }
+        catch (err) { console.error("Invalid network message from host", err); }
       });
       c.on("close", () => {
-        if (!net.started) {
-          handlers.onFatal?.("Host closed the connection.");
+        clearAttemptTimeout();
+        if (net.conns[0] === c) {
+          net.conns[0] = null;
+          connecting = false;
+          stopHeartbeat();
+          scheduleRetry("Connection lost — trying to reconnect…");
         }
       });
       c.on("error", () => {
-        if (!connected) {
-          handlers.onFatal?.("Could not reach the host — check the buzzword.");
+        clearAttemptTimeout();
+        if (net.conns[0] === c) {
+          connecting = false;
+          stopHeartbeat();
+          scheduleRetry("Connection error — trying to reconnect…");
         }
       });
-      // Send hello
       safeSend(c, {
         t: "hello",
         name: net.myName,
         charId: null,
         playerId: net.playerId,
       });
-      // Start heartbeat
+
       if (net.hbTimer) clearInterval(net.hbTimer);
       net.hbTimer = setInterval(() => {
+        if (net.peer !== peer || net.conns[0] !== c) return;
         const now = Date.now();
-        if (!c.open) return;
-        if (now - (c.__lastSeen || now) > GAME.CONN_TIMEOUT_MS) {
-          handlers.onFatal?.("Lost connection to the host.");
-          try {
-            c.close();
-          } catch (_) {
-            // ignore
-          }
-          if (net.hbTimer) {
-            clearInterval(net.hbTimer);
-            net.hbTimer = null;
+        if (!c.open || now - (c.__lastSeen || now) > GAME.CONN_TIMEOUT_MS) {
+          try { c.close(); } catch (_) { /* ignore */ }
+          if (net.conns[0] === c) {
+            net.conns[0] = null;
+            connecting = false;
+            stopHeartbeat();
+            scheduleRetry("Host heartbeat timed out — reconnecting…");
           }
           return;
         }
         safeSend(c, { t: "ping", ts: now });
       }, GAME.HEARTBEAT_MS);
     });
-    // Connection attempt timeout
-    setTimeout(() => {
-      if (!connected) {
-        handlers.onFatal?.(
-          "Could not reach the host — check the buzzword and try again."
-        );
-      }
+
+    c.on("error", () => {
+      if (opened) return;
+      clearAttemptTimeout();
+      if (net.conns[0] === c) net.conns[0] = null;
+      connecting = false;
+      stopHeartbeat();
+      scheduleRetry("Could not establish a connection — retrying…");
+    });
+
+    attemptTimeout = setTimeout(() => {
+      if (opened || net.peer !== peer || net.conns[0] !== c) return;
+      try { c.close(); } catch (_) { /* ignore */ }
+      net.conns[0] = null;
+      connecting = false;
+      stopHeartbeat();
+      scheduleRetry("Connection timed out — retrying…");
     }, 12000);
+  };
+
+  peer.on("open", () => {
+    if (net.peer === peer) connectToHost();
+  });
+  peer.on("disconnected", () => {
+    if (net.peer !== peer || peer.destroyed) return;
+    scheduleRetry("Signalling connection lost — reconnecting…");
   });
   peer.on("error", (e: { type?: string }) => {
-    const ty = e && e.type;
+    if (net.peer !== peer) return;
+    const ty = e?.type;
     if (ty === "peer-unavailable") {
-      handlers.onFatal?.(
-        "That room does not exist (or the host has closed it). Check the buzzword."
-      );
+      if (initialAttempt && !net.started) {
+        handlers.onFatal?.("That room does not exist (or the host has closed it). Check the buzzword.");
+      } else {
+        scheduleRetry("Host not reachable right now — retrying…");
+      }
       return;
     }
-    if (ty === "network" || ty === "socket-error" || ty === "socket-closed") {
-      handlers.onStatus?.("Network hiccup — reconnecting…", true);
-      try {
-        peer.reconnect();
-      } catch (_) {
-        // ignore
-      }
+    if (ty === "network" || ty === "socket-error" || ty === "socket-closed" || ty === "server-error") {
+      scheduleRetry("Signalling hiccup — reconnecting…");
       return;
     }
     handlers.onStatus?.(`Network error: ${ty || "unknown"}`, true);
   });
 }
-
 function onGuestData(
   net: NetState,
   d: NetMessage,
