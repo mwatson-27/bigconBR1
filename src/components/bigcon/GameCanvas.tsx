@@ -217,6 +217,12 @@ export function GameCanvas(props: Props) {
           }
         }
       },
+      onRejoin: (idx) => {
+        if (stateRef.current && net.role === "host" && stateRef.current.players[idx]) {
+          stateRef.current.players[idx].dc = false;
+          engineLog(stateRef.current, `${stateRef.current.players[idx].name} reconnected.`);
+        }
+      },
       onFatal: (msg) => {
         setNetStatus(msg);
         setNetStatusErr(true);
