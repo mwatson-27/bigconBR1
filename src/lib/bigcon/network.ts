@@ -461,9 +461,18 @@ function guestOpenPeer(net: NetState, handlers: NetHandlers) {
   const peer = new Peer(PEER_OPTIONS);
   net.peer = peer;
   let retryTimer: ReturnType<typeof setTimeout> | null = null;
+  let peerOpenTimer: ReturnType<typeof setTimeout> | null = null;
   let attempt = 0;
   let connecting = false;
   let initialAttempt = true;
+  let peerOpened = false;
+
+  const clearPeerOpenTimer = () => {
+    if (peerOpenTimer) {
+      clearTimeout(peerOpenTimer);
+      peerOpenTimer = null;
+    }
+  };
 
   const stopHeartbeat = () => {
     if (net.hbTimer) {
@@ -584,8 +593,30 @@ function guestOpenPeer(net: NetState, handlers: NetHandlers) {
   };
 
   peer.on("open", () => {
-    if (net.peer === peer) connectToHost();
+    if (net.peer !== peer) return;
+    peerOpened = true;
+    clearPeerOpenTimer();
+    connectToHost();
   });
+
+  // A guest peer can fail to open its signalling socket without producing a
+  // useful terminal error. Without this guard the UI can remain on "joining"
+  // forever because the data-connection timeout only starts after peer.open.
+  peerOpenTimer = setTimeout(() => {
+    if (net.peer !== peer || peerOpened || peer.destroyed) return;
+    handlers.onStatus?.(
+      "Could not reach the multiplayer signalling server. Retrying…",
+      true
+    );
+    clearPeerOpenTimer();
+    try { peer.destroy(); } catch (_) { /* ignore */ }
+    if (net.peer === peer) net.peer = null;
+    retryTimer = setTimeout(() => {
+      retryTimer = null;
+      if (net.role === "guest" && !net.peer) guestOpenPeer(net, handlers);
+    }, 1500);
+  }, 12000);
+
   peer.on("disconnected", () => {
     if (net.peer !== peer || peer.destroyed) return;
     scheduleRetry("Signalling connection lost — reconnecting…");
