@@ -5,8 +5,6 @@ import { SetupScreen } from "@/components/bigcon/SetupScreen";
 import { GameCanvas } from "@/components/bigcon/GameCanvas";
 import {
   createNet,
-  hostCreate,
-  guestJoin,
   hostSetChar,
   hostSetGoal,
   type NetState,
@@ -86,26 +84,30 @@ export default function Home() {
   }, []);
 
   function handleHost(name: string, charId: string | null) {
-    const net = netRef.current;
-    hostCreate(net, name, handlers);
-    setMyIdx(0);
-    setRoster(net.roster);
-    setRoomCode(net.roomCode || "");
-    setRoomLabel(net.roomLabel || "");
-    if (charId) {
-      hostSetChar(net, 0, charId);
-      setMyCharId(charId);
-    }
-    setNetStatus(
-      `Room created — seats up to ${GAME.MAX_PLAYERS}. Waiting for co-conspirators…`
-    );
+    // GameCanvas owns the live peer for the entire lobby-to-game lifecycle.
+    // Starting a peer here and another inside GameCanvas reuses the same PeerJS
+    // ID, causes "unavailable-id", and leaves guests attached to the wrong host.
+    setSession({
+      kind: "playing",
+      role: "host",
+      myName: name,
+      roomCode: "",
+      charId,
+      goal,
+    });
   }
 
   function handleJoin(name: string, code: string, charId: string | null) {
-    const net = netRef.current;
-    guestJoin(net, name, code, handlers);
-    setMyCharId(charId);
-    setNetStatus("Contacting the host…");
+    // Join directly through GameCanvas so its lobby handlers stay attached to
+    // the same guest connection when the host starts the match.
+    setSession({
+      kind: "playing",
+      role: "guest",
+      myName: name,
+      roomCode: matchBuzzword(code),
+      charId,
+      goal,
+    });
   }
 
   function handlePickChar(charId: string | null) {
