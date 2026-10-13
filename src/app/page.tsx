@@ -5,8 +5,6 @@ import { SetupScreen } from "@/components/bigcon/SetupScreen";
 import { GameCanvas } from "@/components/bigcon/GameCanvas";
 import {
   createNet,
-  hostCreate,
-  guestJoin,
   hostSetChar,
   hostSetGoal,
   type NetState,
