@@ -441,6 +441,13 @@ function guestOpenPeer(net: NetState, handlers: NetHandlers) {
   let connecting = false;
   let initialAttempt = true;
 
+  const stopHeartbeat = () => {
+    if (net.hbTimer) {
+      clearInterval(net.hbTimer);
+      net.hbTimer = null;
+    }
+  };
+
   const scheduleRetry = (message: string) => {
     if (net.peer !== peer || peer.destroyed || retryTimer) return;
     handlers.onStatus?.(message, true);
@@ -496,6 +503,7 @@ function guestOpenPeer(net: NetState, handlers: NetHandlers) {
         if (net.conns[0] === c) {
           net.conns[0] = null;
           connecting = false;
+          stopHeartbeat();
           scheduleRetry("Connection lost — trying to reconnect…");
         }
       });
@@ -503,6 +511,7 @@ function guestOpenPeer(net: NetState, handlers: NetHandlers) {
         clearAttemptTimeout();
         if (net.conns[0] === c) {
           connecting = false;
+          stopHeartbeat();
           scheduleRetry("Connection error — trying to reconnect…");
         }
       });
@@ -522,6 +531,7 @@ function guestOpenPeer(net: NetState, handlers: NetHandlers) {
           if (net.conns[0] === c) {
             net.conns[0] = null;
             connecting = false;
+            stopHeartbeat();
             scheduleRetry("Host heartbeat timed out — reconnecting…");
           }
           return;
@@ -535,6 +545,7 @@ function guestOpenPeer(net: NetState, handlers: NetHandlers) {
       clearAttemptTimeout();
       if (net.conns[0] === c) net.conns[0] = null;
       connecting = false;
+      stopHeartbeat();
       scheduleRetry("Could not establish a connection — retrying…");
     });
 
@@ -543,6 +554,7 @@ function guestOpenPeer(net: NetState, handlers: NetHandlers) {
       try { c.close(); } catch (_) { /* ignore */ }
       net.conns[0] = null;
       connecting = false;
+      stopHeartbeat();
       scheduleRetry("Connection timed out — retrying…");
     }, 12000);
   };
