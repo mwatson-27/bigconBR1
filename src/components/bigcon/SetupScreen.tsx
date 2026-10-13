@@ -97,7 +97,14 @@ export function SetupScreen(props: Props) {
   return (
     <div
       style={{
-        minHeight: "100vh",
+        height: "100vh",
+        height: "100dvh",
+        minHeight: 0,
+        width: "100%",
+        boxSizing: "border-box",
+        overflowY: "auto",
+        overflowX: "hidden",
+        WebkitOverflowScrolling: "touch",
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
