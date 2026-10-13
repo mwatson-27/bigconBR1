@@ -8,7 +8,9 @@ import {
   PFX,
   PEER_OPTIONS,
   GAME,
+  BUZZWORDS,
   genCode,
+  codeSlug,
   codeLabel,
   matchBuzzword,
 } from "./constants";
@@ -113,12 +115,20 @@ export function hostCreate(
   net.conns = [null];
   net.roomCode = genCode();
   net.roomLabel = codeLabel(net.roomCode);
-  hostOpenPeer(net, handlers);
+  // Room IDs are the public buzzwords themselves, so a room may collide
+  // with another active host. Track tried IDs to avoid endlessly selecting
+  // the same occupied room and ensure the displayed code follows the peer ID.
+  const triedRoomCodes = new Set<string>([net.roomCode]);
+  hostOpenPeer(net, handlers, triedRoomCodes);
   startHostHeartbeat(net, handlers);
   return net;
 }
 
-function hostOpenPeer(net: NetState, handlers: NetHandlers) {
+function hostOpenPeer(
+  net: NetState,
+  handlers: NetHandlers,
+  triedRoomCodes: Set<string>
+) {
   if (!net.roomCode) return;
   const old = net.peer;
   if (old && !old.destroyed) {
@@ -144,7 +154,7 @@ function hostOpenPeer(net: NetState, handlers: NetHandlers) {
       peer.reconnect();
     } catch (_) {
       setTimeout(() => {
-        if (net.peer === peer) hostOpenPeer(net, handlers);
+        if (net.peer === peer) hostOpenPeer(net, handlers, triedRoomCodes);
       }, 1500);
     }
   });
@@ -157,14 +167,28 @@ function hostOpenPeer(net: NetState, handlers: NetHandlers) {
       } catch (_) {
         // ignore
       }
-      net.roomCode = genCode();
-      net.roomLabel = codeLabel(net.roomCode);
-      hostOpenPeer(net, handlers);
+      const nextCode = BUZZWORDS
+        .map((word) => codeSlug(word))
+        .find((candidate) => !triedRoomCodes.has(candidate));
+      if (!nextCode) {
+        handlers.onStatus?.(
+          "All room codes are currently in use. Please try again in a moment.",
+          true
+        );
+        return;
+      }
+      net.roomCode = nextCode;
+      net.roomLabel = codeLabel(nextCode);
+      triedRoomCodes.add(nextCode);
+      handlers.onStatus?.("Room code was already in use — trying a different code…");
+      setTimeout(() => {
+        if (net.peer === peer) hostOpenPeer(net, handlers, triedRoomCodes);
+      }, 250);
       return;
     }
     if (ty === "unavailable-id") {
       setTimeout(() => {
-        if (net.peer === peer) hostOpenPeer(net, handlers);
+        if (net.peer === peer) hostOpenPeer(net, handlers, triedRoomCodes);
       }, 2000);
       return;
     }
@@ -179,7 +203,7 @@ function hostOpenPeer(net: NetState, handlers: NetHandlers) {
         true
       );
       setTimeout(() => {
-        if (net.peer === peer) hostOpenPeer(net, handlers);
+        if (net.peer === peer) hostOpenPeer(net, handlers, triedRoomCodes);
       }, 2000);
       return;
     }
