@@ -438,25 +438,29 @@ export function applyInput(
   const p = s.players[idx];
   if (!p || !p.alive) return;
   const dt = dtMs / 1000;
-  // Movement direction in world space (yaw)
-  const [fx2, fz2] = yawDir(p.yaw);
+  // Apply look before movement so direction always matches the camera
+  // (Three.js camera forward at yaw=0 is world -Z; right is world +X).
+  p.yaw = Number.isFinite(input.yaw) ? input.yaw : p.yaw;
+  p.pitch = Number.isFinite(input.pitch) ? input.pitch : p.pitch;
+  const sinYaw = Math.sin(p.yaw);
+  const cosYaw = Math.cos(p.yaw);
   let mx = 0;
   let mz = 0;
   if (input.forward) {
-    mx += fz2;
-    mz -= fx2;
+    mx -= sinYaw;
+    mz -= cosYaw;
   }
   if (input.back) {
-    mx -= fz2;
-    mz += fx2;
+    mx += sinYaw;
+    mz += cosYaw;
   }
   if (input.left) {
-    mx -= fx2;
-    mz -= fz2;
+    mx -= cosYaw;
+    mz += sinYaw;
   }
   if (input.right) {
-    mx += fx2;
-    mz += fz2;
+    mx += cosYaw;
+    mz -= sinYaw;
   }
   const len = Math.sqrt(mx * mx + mz * mz);
   if (len > 0) {
@@ -485,9 +489,7 @@ export function applyInput(
   const half = GAME.WORLD_SIZE / 2 - 2;
   p.pos[0] = Math.max(-half, Math.min(half, p.pos[0]));
   p.pos[2] = Math.max(-half, Math.min(half, p.pos[2]));
-  // Apply look
-  p.yaw = input.yaw;
-  p.pitch = input.pitch;
+  // Look was applied before movement to keep the movement basis in sync.
 }
 
 // ============ Shooting ============
